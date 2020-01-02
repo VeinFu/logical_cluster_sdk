@@ -3,7 +3,7 @@ package logical_cluster
 import (
 	"encoding/json"
 	"errors"
-	"flag"
+	//"flag"
 	"fmt"
 	"log"
 
@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
+	//"k8s.io/client-go/tools/clientcmd"
 )
 
 type logicalCluster struct {
@@ -21,7 +21,7 @@ type logicalCluster struct {
 
 type hostList []string
 
-func main() {
+/*func main() {
 	var clientset *kubernetes.Clientset
 
 	k8s_config := flag.String("k8s_config", "/Users/vienfu/k8s_env/config", "kubernetes config")
@@ -105,18 +105,18 @@ func main() {
 	}
 	fmt.Println("扩容后：")
 	fmt.Println(clusterMsgAfterExp)
-}
+}*/
 
 // 创建逻辑集群
-func createCluster(clientset *kubernetes.Clientset, clusterName string, hostsInCluster []string) error {
-	if err := addOrUpdateNodeLabel(clientset, hostsInCluster, clusterName); err != nil {
+func CreateCluster(clientset *kubernetes.Clientset, clusterName string, hostsInCluster []string) error {
+	if err := AddOrUpdateNodeLabel(clientset, hostsInCluster, clusterName); err != nil {
 		return err
 	}
 	return nil
 }
 
 // 获取所有逻辑集群及其主机列表
-func listClusters(clientset *kubernetes.Clientset, clustersInfo *string) error {
+func ListClusters(clientset *kubernetes.Clientset, clustersInfo *string) error {
 	var LogicalClusters []logicalCluster
 	labelSelectorRequirement := []metav1.LabelSelectorRequirement{
 		{Key: "logical-cluster", Operator: metav1.LabelSelectorOpExists}}
@@ -138,7 +138,7 @@ func listClusters(clientset *kubernetes.Clientset, clustersInfo *string) error {
 		logicalClusterName := Host.Labels["logical-cluster"]
 		if ret := isInSlice(logicalClusterName, clusterNames); !ret {
 			clusterNames = append(clusterNames, logicalClusterName)
-			hostsInCluster, err := getNodesFromCluster(clientset, logicalClusterName)
+			hostsInCluster, err := GetNodesFromCluster(clientset, logicalClusterName)
 			if err != nil {
 				return err
 			}
@@ -153,8 +153,8 @@ func listClusters(clientset *kubernetes.Clientset, clustersInfo *string) error {
 }
 
 // 获取单个逻辑集群及其主机列表
-func getCluster(clientset *kubernetes.Clientset, clusterName string, clusterInfo *string) error {
-	hostsInCluster, err := getNodesFromCluster(clientset, clusterName)
+func GetCluster(clientset *kubernetes.Clientset, clusterName string, clusterInfo *string) error {
+	hostsInCluster, err := GetNodesFromCluster(clientset, clusterName)
 	if err != nil {
 		return err
 	}
@@ -169,48 +169,47 @@ func getCluster(clientset *kubernetes.Clientset, clusterName string, clusterInfo
 }
 
 // 删除某个逻辑集群
-func deleteCluster(clientset *kubernetes.Clientset, clusterName string) error {
-	hostsLabelRemoved, err := getNodesFromCluster(clientset, clusterName)
+func DeleteCluster(clientset *kubernetes.Clientset, clusterName string) error {
+	hostsLabelRemoved, err := GetNodesFromCluster(clientset, clusterName)
 	if err != nil {
 		return err
 	}
-	if err := removeLabelFromNode(clientset, hostsLabelRemoved); err != nil {
+	if err := RemoveLabelFromNode(clientset, hostsLabelRemoved); err != nil {
 		return err
 	}
 	return nil
 }
 
 // 更新逻辑集群名称
-func updateClusterName(
-	clientset *kubernetes.Clientset, clusterName string, hostsInCluster []string, clusterInfo *string) error {
-	if err := addOrUpdateNodeLabel(clientset, hostsInCluster, clusterName); err != nil {
+func UpdateClusterName(clientset *kubernetes.Clientset, clusterName string, hostsInCluster []string, clusterInfo *string) error {
+	if err := AddOrUpdateNodeLabel(clientset, hostsInCluster, clusterName); err != nil {
 		return err
 	}
-	if err := getCluster(clientset, clusterName, clusterInfo); err != nil {
+	if err := GetCluster(clientset, clusterName, clusterInfo); err != nil {
 		return err
 	}
 	return nil
 }
 
 // 逻辑集群的扩缩容
-func scaleCluster(clientset *kubernetes.Clientset, clusterName string, nodesList []string, isScale bool, clusterInfo *string) error{
+func ScaleCluster(clientset *kubernetes.Clientset, clusterName string, nodesList []string, isScale bool, clusterInfo *string) error{
 	if isScale {// 扩容
-		if err := addOrUpdateNodeLabel(clientset, nodesList, clusterName); err != nil {
+		if err := AddOrUpdateNodeLabel(clientset, nodesList, clusterName); err != nil {
 			return err
 		}
 	} else {// 缩容
-		 if err := removeLabelFromNode(clientset, nodesList); err != nil {
+		 if err := RemoveLabelFromNode(clientset, nodesList); err != nil {
 		 	return err
 		 }
 	}
-	if err := getCluster(clientset, clusterName, clusterInfo); err != nil {
+	if err := GetCluster(clientset, clusterName, clusterInfo); err != nil {
 		return err
 	}
 	return nil
 }
 
 // 节点添加、更新标签，也是添加一个逻辑集群的关键入口
-func addOrUpdateNodeLabel(clientset *kubernetes.Clientset, hostsUpdated []string, labelName string) error {
+func AddOrUpdateNodeLabel(clientset *kubernetes.Clientset, hostsUpdated []string, labelName string) error {
 	patchData := map[string]interface{}{"metadata": map[string]map[string]string{
 		"labels": {"logical-cluster": labelName}}}
 	patchDataBytes, _ := json.Marshal(patchData)
@@ -224,7 +223,7 @@ func addOrUpdateNodeLabel(clientset *kubernetes.Clientset, hostsUpdated []string
 }
 
 // 移除某个特定节点标签
-func removeLabelFromNode(clientset *kubernetes.Clientset, targetNodes []string) error {
+func RemoveLabelFromNode(clientset *kubernetes.Clientset, targetNodes []string) error {
 	patchDataMap := make(map[string]string)
 	patchDataMap["op"] = "remove"
 	patchDataMap["path"] = "/metadata/labels/logical-cluster"
@@ -240,7 +239,7 @@ func removeLabelFromNode(clientset *kubernetes.Clientset, targetNodes []string) 
 }
 
 // 查找具有特定标签的所有主机
-func getNodesFromCluster(clientset *kubernetes.Clientset, clusterName string) (hostList, error) {
+func GetNodesFromCluster(clientset *kubernetes.Clientset, clusterName string) (hostList, error) {
 	var hosts []string
 	labelMap := make(map[string]string)
 	labelMap["logical-cluster"] = clusterName
